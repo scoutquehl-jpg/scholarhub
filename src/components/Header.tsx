@@ -1,23 +1,60 @@
 import { GraduationCap } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
+import { cn } from "@/lib/utils"
 
 export function Header({ children }: { children?: React.ReactNode }) {
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className="mx-auto max-w-6xl px-6 py-5">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <GraduationCap className="size-5" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              ScholarHub
-            </span>
-          </Link>
+      <div className="mx-auto max-w-6xl px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-5">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <GraduationCap className="size-5" />
+              </div>
+              <span className="text-lg font-semibold tracking-tight">
+                ScholarHub
+              </span>
+            </Link>
+
+            <nav className="flex items-center gap-1">
+              <HeaderNavLink to="/" end>
+                Clubs
+              </HeaderNavLink>
+              <HeaderNavLink to="/dashboard">My Dashboard</HeaderNavLink>
+            </nav>
+          </div>
 
           {children}
         </div>
       </div>
     </header>
+  )
+}
+
+function HeaderNavLink({
+  to,
+  end,
+  children,
+}: {
+  to: string
+  end?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          "rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
+          isActive
+            ? "bg-secondary text-secondary-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        )
+      }
+    >
+      {children}
+    </NavLink>
   )
 }
