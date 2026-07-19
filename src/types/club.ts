@@ -3,6 +3,14 @@ export interface ClubLeader {
   role: string
 }
 
+export interface ClubAnnouncement {
+  id: string
+  title: string
+  body: string
+  date: string
+  tag: string
+}
+
 export interface Club {
   id: string
   name: string
@@ -16,4 +24,6 @@ export interface Club {
   memberCount: number
   founded: number
   leadership: ClubLeader[]
+  announcements: ClubAnnouncement[]
+  howToJoin: string[]
 }
