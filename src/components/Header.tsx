@@ -1,5 +1,6 @@
 import { GraduationCap } from "lucide-react"
 import { Link, NavLink } from "react-router-dom"
+import { AuthStatus } from "@/components/AuthStatus"
 import { cn } from "@/lib/utils"
 
 export function Header({ children }: { children?: React.ReactNode }) {
@@ -25,7 +26,10 @@ export function Header({ children }: { children?: React.ReactNode }) {
             </nav>
           </div>
 
-          {children}
+          <div className="flex items-center gap-4">
+            {children}
+            <AuthStatus />
+          </div>
         </div>
       </div>
     </header>
