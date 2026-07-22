@@ -14,6 +14,7 @@ export interface VolunteerEntry {
   date: string
   orgName: string
   hours: number
+  club: string | null
 }
 
 export interface Extracurricular {

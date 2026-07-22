@@ -91,6 +91,7 @@ export async function fetchVolunteerEntries(userId: string): Promise<VolunteerEn
     date: row.date,
     orgName: row.org_name,
     hours: Number(row.hours),
+    club: row.club,
   }))
 }
 
@@ -100,19 +101,31 @@ export async function addVolunteerEntry(
 ): Promise<VolunteerEntry> {
   const { data, error } = await supabase
     .from("volunteer_entries")
-    .insert({ user_id: userId, date: entry.date, org_name: entry.orgName, hours: entry.hours })
+    .insert({
+      user_id: userId,
+      date: entry.date,
+      org_name: entry.orgName,
+      hours: entry.hours,
+      club: entry.club,
+    })
     .select()
     .single()
 
   if (error) throw error
 
-  return { id: data.id, date: data.date, orgName: data.org_name, hours: Number(data.hours) }
+  return {
+    id: data.id,
+    date: data.date,
+    orgName: data.org_name,
+    hours: Number(data.hours),
+    club: data.club,
+  }
 }
 
 export async function updateVolunteerEntry(id: string, patch: Omit<VolunteerEntry, "id">) {
   const { error } = await supabase
     .from("volunteer_entries")
-    .update({ date: patch.date, org_name: patch.orgName, hours: patch.hours })
+    .update({ date: patch.date, org_name: patch.orgName, hours: patch.hours, club: patch.club })
     .eq("id", id)
 
   if (error) throw error

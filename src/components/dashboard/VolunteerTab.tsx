@@ -13,7 +13,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { EmptyState } from "@/components/dashboard/EmptyState"
+import { clubs } from "@/data/clubs"
 import { formatDate } from "@/lib/utils"
 import type { VolunteerEntry } from "@/types/student"
 
@@ -84,6 +92,7 @@ export function VolunteerTab({
                 <p className="text-sm font-medium">{entry.orgName}</p>
                 <p className="text-xs text-muted-foreground">
                   {formatDate(entry.date)}
+                  {entry.club && <> · {entry.club}</>}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -141,6 +150,7 @@ function VolunteerEntryDialog({
   const [date, setDate] = useState(entry?.date ?? "")
   const [orgName, setOrgName] = useState(entry?.orgName ?? "")
   const [hours, setHours] = useState(entry ? String(entry.hours) : "")
+  const [club, setClub] = useState(entry?.club ?? "none")
   const [saving, setSaving] = useState(false)
 
   const parsedHours = Number(hours)
@@ -152,13 +162,19 @@ function VolunteerEntryDialog({
       setDate(entry?.date ?? "")
       setOrgName(entry?.orgName ?? "")
       setHours(entry ? String(entry.hours) : "")
+      setClub(entry?.club ?? "none")
     }
   }
 
   async function handleSubmit() {
     if (!canSubmit) return
     setSaving(true)
-    await onSubmit({ date, orgName: orgName.trim(), hours: parsedHours })
+    await onSubmit({
+      date,
+      orgName: orgName.trim(),
+      hours: parsedHours,
+      club: club === "none" ? null : club,
+    })
     setSaving(false)
     handleOpenChange(false)
   }
@@ -205,6 +221,22 @@ function VolunteerEntryDialog({
               onChange={(e) => setHours(e.target.value)}
               placeholder="2.5"
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="volunteer-club">Club (optional)</Label>
+            <Select value={club} onValueChange={(value) => setClub(value ?? "none")}>
+              <SelectTrigger id="volunteer-club" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {clubs.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>
