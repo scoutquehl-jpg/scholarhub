@@ -26,6 +26,8 @@ export async function getOrCreateProfile(userId: string): Promise<StudentProfile
       school: data.school,
       gradYear: data.grad_year,
       volunteerGoalHours: data.volunteer_goal_hours,
+      avatarUrl: data.avatar_url,
+      bannerUrl: data.banner_url,
     }
   }
 
@@ -51,6 +53,8 @@ export async function getOrCreateProfile(userId: string): Promise<StudentProfile
     school: inserted.school,
     gradYear: inserted.grad_year,
     volunteerGoalHours: inserted.volunteer_goal_hours,
+    avatarUrl: inserted.avatar_url,
+    bannerUrl: inserted.banner_url,
   }
 }
 
@@ -66,6 +70,8 @@ export async function updateProfile(
   if (patch.volunteerGoalHours !== undefined) {
     dbPatch.volunteer_goal_hours = patch.volunteerGoalHours
   }
+  if (patch.avatarUrl !== undefined) dbPatch.avatar_url = patch.avatarUrl
+  if (patch.bannerUrl !== undefined) dbPatch.banner_url = patch.bannerUrl
 
   const { error } = await supabase.from("profiles").update(dbPatch).eq("id", userId)
   if (error) throw error
@@ -273,4 +279,26 @@ export async function updateEssay(id: string, patch: Omit<Essay, "id">) {
 export async function deleteEssay(id: string) {
   const { error } = await supabase.from("essays").delete().eq("id", id)
   if (error) throw error
+}
+
+async function uploadProfileImage(userId: string, kind: "avatar" | "banner", file: File) {
+  const ext = file.name.split(".").pop() || "jpg"
+  const path = `${userId}/${kind}.${ext}`
+
+  const { error } = await supabase.storage
+    .from("profile-media")
+    .upload(path, file, { upsert: true, cacheControl: "3600" })
+
+  if (error) throw error
+
+  const { data } = supabase.storage.from("profile-media").getPublicUrl(path)
+  return `${data.publicUrl}?t=${Date.now()}`
+}
+
+export function uploadAvatar(userId: string, file: File) {
+  return uploadProfileImage(userId, "avatar", file)
+}
+
+export function uploadBanner(userId: string, file: File) {
+  return uploadProfileImage(userId, "banner", file)
 }

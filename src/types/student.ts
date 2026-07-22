@@ -5,6 +5,8 @@ export interface StudentProfile {
   school: string
   gradYear: number | null
   volunteerGoalHours: number
+  avatarUrl: string | null
+  bannerUrl: string | null
 }
 
 export interface VolunteerEntry {

@@ -1,5 +1,13 @@
-import { GraduationCap, HeartHandshake, Pencil, School, UserRound } from "lucide-react"
-import { useState } from "react"
+import {
+  Camera,
+  GraduationCap,
+  HeartHandshake,
+  Loader2,
+  Pencil,
+  School,
+  UserRound,
+} from "lucide-react"
+import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GRADE_OPTIONS } from "@/data/student"
-import { initials } from "@/lib/utils"
+import { cn, initials } from "@/lib/utils"
 import type { StudentProfile } from "@/types/student"
 
 interface ProfileHeaderProps {
@@ -29,6 +37,8 @@ interface ProfileHeaderProps {
   activityCount: number
   schoolCount: number
   onSave: (patch: Partial<Omit<StudentProfile, "id">>) => void | Promise<void>
+  onAvatarUpload: (file: File) => void | Promise<void>
+  onBannerUpload: (file: File) => void | Promise<void>
 }
 
 export function ProfileHeader({
@@ -37,17 +47,49 @@ export function ProfileHeader({
   activityCount,
   schoolCount,
   onSave,
+  onAvatarUpload,
+  onBannerUpload,
 }: ProfileHeaderProps) {
   const hasName = profile.name.trim() !== ""
   const hasDetails = profile.grade !== "" || profile.school !== "" || profile.gradYear !== null
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="h-24 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500 sm:h-32" />
+      <div className="relative h-24 sm:h-32">
+        {profile.bannerUrl ? (
+          <img
+            src={profile.bannerUrl}
+            alt=""
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="size-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500" />
+        )}
+        <ImageUploadButton
+          label="Change banner"
+          onUpload={onBannerUpload}
+          className="absolute right-2 bottom-2"
+        />
+      </div>
       <div className="px-6 pb-6">
         <div className="flex items-end justify-between gap-3">
-          <div className="-mt-10 flex size-20 items-center justify-center rounded-full border-4 border-card bg-primary text-2xl font-semibold text-primary-foreground shadow-sm">
-            {hasName ? initials(profile.name) : <UserRound className="size-8" />}
+          <div className="relative -mt-10 flex size-20 items-center justify-center overflow-hidden rounded-full border-4 border-card bg-primary text-2xl font-semibold text-primary-foreground shadow-sm">
+            {profile.avatarUrl ? (
+              <img
+                src={profile.avatarUrl}
+                alt=""
+                className="size-full object-cover"
+              />
+            ) : hasName ? (
+              initials(profile.name)
+            ) : (
+              <UserRound className="size-8" />
+            )}
+            <ImageUploadButton
+              label="Change profile picture"
+              onUpload={onAvatarUpload}
+              className="absolute right-0 bottom-0"
+            />
           </div>
           <EditProfileDialog profile={profile} onSave={onSave} />
         </div>
@@ -98,6 +140,54 @@ export function ProfileHeader({
         </div>
       </div>
     </div>
+  )
+}
+
+function ImageUploadButton({
+  label,
+  onUpload,
+  className,
+}: {
+  label: string
+  onUpload: (file: File) => void | Promise<void>
+  className?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      await onUpload(file)
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ""
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleChange}
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon-sm"
+        aria-label={label}
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+        className={cn("rounded-full shadow-sm", className)}
+      >
+        {uploading ? <Loader2 className="animate-spin" /> : <Camera />}
+      </Button>
+    </>
   )
 }
 

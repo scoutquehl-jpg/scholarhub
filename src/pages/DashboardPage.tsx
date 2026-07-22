@@ -85,6 +85,16 @@ export function DashboardPage() {
     setProfile((prev) => (prev ? { ...prev, volunteerGoalHours: goal } : prev))
   }
 
+  async function handleAvatarUpload(file: File) {
+    const avatarUrl = await dashboardData.uploadAvatar(userId, file)
+    await handleProfileSave({ avatarUrl })
+  }
+
+  async function handleBannerUpload(file: File) {
+    const bannerUrl = await dashboardData.uploadBanner(userId, file)
+    await handleProfileSave({ bannerUrl })
+  }
+
   async function handleAddVolunteerEntry(entry: Omit<VolunteerEntry, "id">) {
     const created = await dashboardData.addVolunteerEntry(userId, entry)
     setVolunteerEntries((prev) => [...prev, created])
@@ -156,6 +166,8 @@ export function DashboardPage() {
           activityCount={activities.length}
           schoolCount={schools.length}
           onSave={handleProfileSave}
+          onAvatarUpload={handleAvatarUpload}
+          onBannerUpload={handleBannerUpload}
         />
 
         <Tabs defaultValue="volunteer" className="mt-6">
