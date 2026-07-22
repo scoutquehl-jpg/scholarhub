@@ -6,22 +6,132 @@ import {
   ListChecks,
   MapPin,
   Megaphone,
+  Pencil,
   UserPlus,
   Users,
 } from "lucide-react"
-import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Header } from "@/components/Header"
 import { MessagePresidentDialog } from "@/components/MessagePresidentDialog"
-import { clubs } from "@/data/clubs"
-import { cn, formatDate, initials } from "@/lib/utils"
+import { useAuth } from "@/lib/auth"
+import {
+  fetchAnnouncements,
+  fetchClubById,
+  fetchFollowerCount,
+  followClub,
+  isFollowingClub,
+  subscribeToAnnouncements,
+  unfollowClub,
+} from "@/lib/clubsData"
+import { cn, formatTimestamp, initials } from "@/lib/utils"
+import type { Club, ClubAnnouncement } from "@/types/club"
 
 export function ClubPage() {
   const { clubId } = useParams<{ clubId: string }>()
-  const club = clubs.find((c) => c.id === clubId)
+  const { session } = useAuth()
+  const navigate = useNavigate()
+
+  const [club, setClub] = useState<Club | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>([])
+  const [followerCount, setFollowerCount] = useState(0)
   const [following, setFollowing] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
+
+  useEffect(() => {
+    if (!clubId) return
+    let cancelled = false
+    setLoading(true)
+    fetchClubById(clubId).then((result) => {
+      if (!cancelled) {
+        setClub(result)
+        setLoading(false)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [clubId])
+
+  useEffect(() => {
+    if (!club) return
+    let cancelled = false
+
+    fetchAnnouncements(club.id).then((result) => {
+      if (!cancelled) setAnnouncements(result)
+    })
+
+    const unsubscribe = subscribeToAnnouncements(
+      club.id,
+      (announcement) => {
+        setAnnouncements((prev) => [announcement, ...prev])
+      },
+      (id) => {
+        setAnnouncements((prev) => prev.filter((a) => a.id !== id))
+      }
+    )
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [club])
+
+  useEffect(() => {
+    if (!club) return
+    let cancelled = false
+
+    fetchFollowerCount(club.id).then((count) => {
+      if (!cancelled) setFollowerCount(count)
+    })
+
+    if (session) {
+      isFollowingClub(session.user.id, club.id).then((result) => {
+        if (!cancelled) setFollowing(result)
+      })
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [club, session])
+
+  async function handleFollowToggle() {
+    if (!club) return
+    if (!session) {
+      navigate("/login")
+      return
+    }
+
+    setFollowBusy(true)
+    try {
+      if (following) {
+        await unfollowClub(session.user.id, club.id)
+        setFollowing(false)
+        setFollowerCount((prev) => Math.max(0, prev - 1))
+      } else {
+        await followClub(session.user.id, club.id)
+        setFollowing(true)
+        setFollowerCount((prev) => prev + 1)
+      }
+    } finally {
+      setFollowBusy(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-svh bg-background">
+        <Header />
+        <main className="mx-auto max-w-3xl px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">Loading club...</p>
+        </main>
+      </div>
+    )
+  }
 
   if (!club) {
     return (
@@ -44,7 +154,7 @@ export function ClubPage() {
   const president =
     club.leadership.find((leader) => leader.role === "President") ??
     club.leadership[0]
-  const displayedMemberCount = club.memberCount + (following ? 1 : 0)
+  const isOfficer = session?.user.id === club.officerId
 
   return (
     <div className="min-h-svh bg-background">
@@ -72,13 +182,22 @@ export function ClubPage() {
                 {club.emoji}
               </div>
               <div className="flex gap-2">
-                <MessagePresidentDialog
-                  president={president}
-                  clubName={club.name}
-                />
+                {isOfficer && (
+                  <Link
+                    to={`/clubs/${club.id}/edit`}
+                    className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+                  >
+                    <Pencil />
+                    Edit Club
+                  </Link>
+                )}
+                {president && (
+                  <MessagePresidentDialog president={president} clubName={club.name} />
+                )}
                 <Button
                   variant={following ? "secondary" : "default"}
-                  onClick={() => setFollowing((f) => !f)}
+                  onClick={handleFollowToggle}
+                  disabled={followBusy}
                 >
                   {following ? <Check /> : <UserPlus />}
                   {following ? "Following" : "Follow"}
@@ -90,17 +209,17 @@ export function ClubPage() {
               <h1 className="text-2xl font-semibold tracking-tight">
                 {club.name}
               </h1>
-              <Badge variant="secondary">{club.category}</Badge>
+              <Badge variant="secondary">{club.category || "Uncategorized"}</Badge>
             </div>
 
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground">
-              {club.longDescription}
+              {club.longDescription || "This club hasn't added a description yet."}
             </p>
 
             <div className="mt-4 flex items-center gap-1.5 border-t border-border pt-4 text-sm">
               <Users className="size-4 text-muted-foreground" />
               <span className="font-semibold text-foreground">
-                {displayedMemberCount}
+                {followerCount}
               </span>
               <span className="text-muted-foreground">members</span>
             </div>
@@ -114,25 +233,31 @@ export function ClubPage() {
               Announcements
             </h2>
             <div className="mt-3 flex flex-col gap-3">
-              {club.announcements.map((announcement) => (
-                <div
-                  key={announcement.id}
-                  className="rounded-xl border border-border bg-card p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-medium text-card-foreground">
-                      {announcement.title}
-                    </h3>
-                    <Badge variant="outline">{announcement.tag}</Badge>
+              {announcements.length > 0 ? (
+                announcements.map((announcement) => (
+                  <div
+                    key={announcement.id}
+                    className="rounded-xl border border-border bg-card p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-medium text-card-foreground">
+                        {announcement.title}
+                      </h3>
+                      <Badge variant="outline">{announcement.tag}</Badge>
+                    </div>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                      {announcement.body}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {formatTimestamp(announcement.createdAt)}
+                    </p>
                   </div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {announcement.body}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {formatDate(announcement.date)}
-                  </p>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                  No announcements yet.
                 </div>
-              ))}
+              )}
             </div>
           </section>
 
@@ -144,58 +269,64 @@ export function ClubPage() {
               <div className="mt-3 flex flex-col gap-2.5 text-sm">
                 <div className="flex items-center gap-2">
                   <Clock className="size-4 shrink-0 text-muted-foreground" />
-                  <span>{club.meetingTime}</span>
+                  <span>{club.meetingTime || "Meeting time not set"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="size-4 shrink-0 text-muted-foreground" />
-                  <span>{club.meetingLocation}</span>
+                  <span>{club.meetingLocation || "Room not set"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="size-4 shrink-0 text-muted-foreground" />
-                  <span>Founded {club.founded}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-4">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                <ListChecks className="size-4" />
-                How to Join
-              </h2>
-              <ol className="mt-3 flex flex-col gap-3 text-sm">
-                {club.howToJoin.map((step, index) => (
-                  <li key={step} className="flex gap-2.5">
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
-                      {index + 1}
-                    </span>
-                    <span className="text-foreground">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-4">
-              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Officer Roster
-              </h2>
-              <div className="mt-3 flex flex-col gap-3">
-                {club.leadership.map((leader) => (
-                  <div key={leader.name} className="flex items-center gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                      {initials(leader.name)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {leader.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {leader.role}
-                      </p>
-                    </div>
+                {club.founded && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="size-4 shrink-0 text-muted-foreground" />
+                    <span>Founded {club.founded}</span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
+
+            {club.howToJoin.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h2 className="flex items-center gap-1.5 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  <ListChecks className="size-4" />
+                  How to Join
+                </h2>
+                <ol className="mt-3 flex flex-col gap-3 text-sm">
+                  {club.howToJoin.map((step, index) => (
+                    <li key={step} className="flex gap-2.5">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+                        {index + 1}
+                      </span>
+                      <span className="text-foreground">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {club.leadership.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Officer Roster
+                </h2>
+                <div className="mt-3 flex flex-col gap-3">
+                  {club.leadership.map((leader) => (
+                    <div key={leader.name} className="flex items-center gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                        {initials(leader.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {leader.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {leader.role}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </main>

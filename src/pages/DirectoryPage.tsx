@@ -1,13 +1,27 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/Header"
 import { SearchInput } from "@/components/SearchInput"
 import { CategoryFilter } from "@/components/CategoryFilter"
 import { ClubCard } from "@/components/ClubCard"
-import { clubs, categories } from "@/data/clubs"
+import { fetchClubs } from "@/lib/clubsData"
+import type { Club } from "@/types/club"
 
 export function DirectoryPage() {
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState<string | null>(null)
+  const [clubs, setClubs] = useState<Club[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchClubs()
+      .then(setClubs)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const categories = useMemo(
+    () => Array.from(new Set(clubs.map((club) => club.category))).sort(),
+    [clubs]
+  )
 
   const filteredClubs = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -19,7 +33,7 @@ export function DirectoryPage() {
         club.description.toLowerCase().includes(query)
       return matchesCategory && matchesQuery
     })
-  }, [search, category])
+  }, [clubs, search, category])
 
   return (
     <div className="min-h-svh bg-background">
@@ -44,7 +58,9 @@ export function DirectoryPage() {
           />
         </div>
 
-        {filteredClubs.length > 0 ? (
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading clubs...</p>
+        ) : filteredClubs.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredClubs.map((club) => (
               <ClubCard key={club.id} club={club} />

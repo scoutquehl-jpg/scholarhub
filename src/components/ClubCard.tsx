@@ -29,7 +29,7 @@ export function ClubCard({ club }: { club: Club }) {
       </div>
 
       <p className="flex-1 text-sm leading-relaxed text-muted-foreground">
-        {club.description}
+        {club.description || "No description yet."}
       </p>
 
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

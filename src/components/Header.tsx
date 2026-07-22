@@ -1,9 +1,12 @@
 import { GraduationCap } from "lucide-react"
 import { Link, NavLink } from "react-router-dom"
 import { AuthStatus } from "@/components/AuthStatus"
+import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
 export function Header({ children }: { children?: React.ReactNode }) {
+  const { session } = useAuth()
+
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
       <div className="mx-auto max-w-6xl px-6 py-4">
@@ -23,6 +26,9 @@ export function Header({ children }: { children?: React.ReactNode }) {
                 Clubs
               </HeaderNavLink>
               <HeaderNavLink to="/dashboard">My Dashboard</HeaderNavLink>
+              {session && (
+                <HeaderNavLink to="/claim">Claim Club</HeaderNavLink>
+              )}
             </nav>
           </div>
 

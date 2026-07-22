@@ -21,13 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { EmptyState } from "@/components/dashboard/EmptyState"
-import { clubs } from "@/data/clubs"
 import { formatDate } from "@/lib/utils"
+import type { Club } from "@/types/club"
 import type { VolunteerEntry } from "@/types/student"
 
 interface VolunteerTabProps {
   entries: VolunteerEntry[]
   goal: number
+  clubs: Club[]
   onAddEntry: (entry: Omit<VolunteerEntry, "id">) => void | Promise<void>
   onEditEntry: (id: string, entry: Omit<VolunteerEntry, "id">) => void | Promise<void>
   onDeleteEntry: (id: string) => void | Promise<void>
@@ -37,6 +38,7 @@ interface VolunteerTabProps {
 export function VolunteerTab({
   entries,
   goal,
+  clubs,
   onAddEntry,
   onEditEntry,
   onDeleteEntry,
@@ -71,6 +73,7 @@ export function VolunteerTab({
           Entries
         </h2>
         <VolunteerEntryDialog
+          clubs={clubs}
           onSubmit={onAddEntry}
           trigger={
             <Button size="sm">
@@ -102,6 +105,7 @@ export function VolunteerTab({
                 <div className="flex items-center gap-1">
                   <VolunteerEntryDialog
                     entry={entry}
+                    clubs={clubs}
                     onSubmit={(values) => onEditEntry(entry.id, values)}
                     trigger={
                       <Button variant="ghost" size="icon-sm" aria-label="Edit entry">
@@ -139,10 +143,12 @@ export function VolunteerTab({
 
 function VolunteerEntryDialog({
   entry,
+  clubs,
   onSubmit,
   trigger,
 }: {
   entry?: VolunteerEntry
+  clubs: Club[]
   onSubmit: (values: Omit<VolunteerEntry, "id">) => void | Promise<void>
   trigger: React.ReactElement
 }) {

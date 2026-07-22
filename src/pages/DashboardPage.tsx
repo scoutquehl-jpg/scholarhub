@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth"
 import * as dashboardData from "@/lib/dashboardData"
+import { fetchClubs } from "@/lib/clubsData"
+import type { Club } from "@/types/club"
 import type {
   CollegeEntry,
   Essay,
@@ -28,6 +30,7 @@ export function DashboardPage() {
   const [activities, setActivities] = useState<Extracurricular[]>([])
   const [schools, setSchools] = useState<CollegeEntry[]>([])
   const [essays, setEssays] = useState<Essay[]>([])
+  const [clubs, setClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,13 +45,15 @@ export function DashboardPage() {
       dashboardData.fetchExtracurriculars(session.user.id),
       dashboardData.fetchSchools(session.user.id),
       dashboardData.fetchEssays(session.user.id),
-    ]).then(([p, v, a, s, e]) => {
+      fetchClubs(),
+    ]).then(([p, v, a, s, e, c]) => {
       if (cancelled) return
       setProfile(p)
       setVolunteerEntries(v)
       setActivities(a)
       setSchools(s)
       setEssays(e)
+      setClubs(c)
       setLoading(false)
     })
 
@@ -181,6 +186,7 @@ export function DashboardPage() {
             <VolunteerTab
               entries={volunteerEntries}
               goal={profile.volunteerGoalHours}
+              clubs={clubs}
               onAddEntry={handleAddVolunteerEntry}
               onEditEntry={handleEditVolunteerEntry}
               onDeleteEntry={handleDeleteVolunteerEntry}

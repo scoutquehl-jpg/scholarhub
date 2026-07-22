@@ -21,3 +21,10 @@ export function formatDate(date: string) {
     day: "numeric",
   })
 }
+
+export function formatTimestamp(isoString: string) {
+  return new Date(isoString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
