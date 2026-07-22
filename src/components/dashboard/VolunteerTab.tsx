@@ -1,4 +1,4 @@
-import { HeartHandshake, Pencil, Plus } from "lucide-react"
+import { HeartHandshake, Pencil, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,14 +20,18 @@ import type { VolunteerEntry } from "@/types/student"
 interface VolunteerTabProps {
   entries: VolunteerEntry[]
   goal: number
-  onAddEntry: (entry: Omit<VolunteerEntry, "id">) => void
-  onGoalChange: (goal: number) => void
+  onAddEntry: (entry: Omit<VolunteerEntry, "id">) => void | Promise<void>
+  onEditEntry: (id: string, entry: Omit<VolunteerEntry, "id">) => void | Promise<void>
+  onDeleteEntry: (id: string) => void | Promise<void>
+  onGoalChange: (goal: number) => void | Promise<void>
 }
 
 export function VolunteerTab({
   entries,
   goal,
   onAddEntry,
+  onEditEntry,
+  onDeleteEntry,
   onGoalChange,
 }: VolunteerTabProps) {
   const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0)
@@ -58,7 +62,15 @@ export function VolunteerTab({
         <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Entries
         </h2>
-        <AddVolunteerEntryDialog onAdd={onAddEntry} />
+        <VolunteerEntryDialog
+          onSubmit={onAddEntry}
+          trigger={
+            <Button size="sm">
+              <Plus />
+              Add Entry
+            </Button>
+          }
+        />
       </div>
 
       {sortedEntries.length > 0 ? (
@@ -74,9 +86,34 @@ export function VolunteerTab({
                   {formatDate(entry.date)}
                 </p>
               </div>
-              <span className="text-sm font-semibold tabular-nums">
-                {entry.hours} hrs
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold tabular-nums">
+                  {entry.hours} hrs
+                </span>
+                <div className="flex items-center gap-1">
+                  <VolunteerEntryDialog
+                    entry={entry}
+                    onSubmit={(values) => onEditEntry(entry.id, values)}
+                    trigger={
+                      <Button variant="ghost" size="icon-sm" aria-label="Edit entry">
+                        <Pencil />
+                      </Button>
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Delete entry"
+                    onClick={() => {
+                      if (confirm(`Delete this entry for ${entry.orgName}?`)) {
+                        onDeleteEntry(entry.id)
+                      }
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -91,49 +128,51 @@ export function VolunteerTab({
   )
 }
 
-function AddVolunteerEntryDialog({
-  onAdd,
+function VolunteerEntryDialog({
+  entry,
+  onSubmit,
+  trigger,
 }: {
-  onAdd: (entry: Omit<VolunteerEntry, "id">) => void
+  entry?: VolunteerEntry
+  onSubmit: (values: Omit<VolunteerEntry, "id">) => void | Promise<void>
+  trigger: React.ReactElement
 }) {
   const [open, setOpen] = useState(false)
-  const [date, setDate] = useState("")
-  const [orgName, setOrgName] = useState("")
-  const [hours, setHours] = useState("")
+  const [date, setDate] = useState(entry?.date ?? "")
+  const [orgName, setOrgName] = useState(entry?.orgName ?? "")
+  const [hours, setHours] = useState(entry ? String(entry.hours) : "")
+  const [saving, setSaving] = useState(false)
 
   const parsedHours = Number(hours)
   const canSubmit = date !== "" && orgName.trim() !== "" && parsedHours > 0
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
-      setDate("")
-      setOrgName("")
-      setHours("")
+    if (next) {
+      setDate(entry?.date ?? "")
+      setOrgName(entry?.orgName ?? "")
+      setHours(entry ? String(entry.hours) : "")
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
-    onAdd({ date, orgName: orgName.trim(), hours: parsedHours })
+    setSaving(true)
+    await onSubmit({ date, orgName: orgName.trim(), hours: parsedHours })
+    setSaving(false)
     handleOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button size="sm">
-            <Plus />
-            Add Entry
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log volunteer hours</DialogTitle>
+          <DialogTitle>{entry ? "Edit entry" : "Log volunteer hours"}</DialogTitle>
           <DialogDescription>
-            Add a new entry to your volunteer log.
+            {entry
+              ? "Update this volunteer log entry."
+              : "Add a new entry to your volunteer log."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -169,8 +208,8 @@ function AddVolunteerEntryDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
-            Add Entry
+          <Button onClick={handleSubmit} disabled={!canSubmit || saving}>
+            {entry ? "Save Changes" : "Add Entry"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -183,20 +222,23 @@ function EditGoalDialog({
   onSave,
 }: {
   goal: number
-  onSave: (goal: number) => void
+  onSave: (goal: number) => void | Promise<void>
 }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(String(goal))
+  const [saving, setSaving] = useState(false)
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
     if (next) setValue(String(goal))
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const parsed = Number(value)
     if (!parsed || parsed <= 0) return
-    onSave(parsed)
+    setSaving(true)
+    await onSave(parsed)
+    setSaving(false)
     setOpen(false)
   }
 
@@ -227,7 +269,9 @@ function EditGoalDialog({
           />
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit}>Save</Button>
+          <Button onClick={handleSubmit} disabled={saving}>
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,4 @@
-import { GraduationCap, Plus } from "lucide-react"
+import { GraduationCap, Pencil, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,12 +26,16 @@ import type { Extracurricular } from "@/types/student"
 
 interface ExtracurricularsTabProps {
   activities: Extracurricular[]
-  onAdd: (activity: Omit<Extracurricular, "id">) => void
+  onAdd: (activity: Omit<Extracurricular, "id">) => void | Promise<void>
+  onEdit: (id: string, activity: Omit<Extracurricular, "id">) => void | Promise<void>
+  onDelete: (id: string) => void | Promise<void>
 }
 
 export function ExtracurricularsTab({
   activities,
   onAdd,
+  onEdit,
+  onDelete,
 }: ExtracurricularsTabProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -39,7 +43,15 @@ export function ExtracurricularsTab({
         <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Activities
         </h2>
-        <AddActivityDialog onAdd={onAdd} />
+        <ActivityDialog
+          onSubmit={onAdd}
+          trigger={
+            <Button size="sm">
+              <Plus />
+              Add Activity
+            </Button>
+          }
+        />
       </div>
 
       {activities.length > 0 ? (
@@ -60,9 +72,34 @@ export function ExtracurricularsTab({
                 </div>
                 <Badge variant="secondary">{activity.gradeStarted}</Badge>
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                {activity.hoursPerWeek} hrs/week
-              </p>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {activity.hoursPerWeek} hrs/week
+                </p>
+                <div className="flex items-center gap-1">
+                  <ActivityDialog
+                    activity={activity}
+                    onSubmit={(values) => onEdit(activity.id, values)}
+                    trigger={
+                      <Button variant="ghost" size="icon-sm" aria-label="Edit activity">
+                        <Pencil />
+                      </Button>
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Delete activity"
+                    onClick={() => {
+                      if (confirm(`Delete "${activity.name}"?`)) {
+                        onDelete(activity.id)
+                      }
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -77,57 +114,62 @@ export function ExtracurricularsTab({
   )
 }
 
-function AddActivityDialog({
-  onAdd,
+function ActivityDialog({
+  activity,
+  onSubmit,
+  trigger,
 }: {
-  onAdd: (activity: Omit<Extracurricular, "id">) => void
+  activity?: Extracurricular
+  onSubmit: (values: Omit<Extracurricular, "id">) => void | Promise<void>
+  trigger: React.ReactElement
 }) {
   const [open, setOpen] = useState(false)
-  const [name, setName] = useState("")
-  const [role, setRole] = useState("")
-  const [hoursPerWeek, setHoursPerWeek] = useState("")
-  const [gradeStarted, setGradeStarted] = useState(GRADE_OPTIONS[0])
+  const [name, setName] = useState(activity?.name ?? "")
+  const [role, setRole] = useState(activity?.role ?? "")
+  const [hoursPerWeek, setHoursPerWeek] = useState(
+    activity ? String(activity.hoursPerWeek) : ""
+  )
+  const [gradeStarted, setGradeStarted] = useState(
+    activity?.gradeStarted ?? GRADE_OPTIONS[0]
+  )
+  const [saving, setSaving] = useState(false)
 
   const parsedHours = Number(hoursPerWeek)
-  const canSubmit =
-    name.trim() !== "" && role.trim() !== "" && parsedHours > 0
+  const canSubmit = name.trim() !== "" && role.trim() !== "" && parsedHours > 0
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
-      setName("")
-      setRole("")
-      setHoursPerWeek("")
-      setGradeStarted(GRADE_OPTIONS[0])
+    if (next) {
+      setName(activity?.name ?? "")
+      setRole(activity?.role ?? "")
+      setHoursPerWeek(activity ? String(activity.hoursPerWeek) : "")
+      setGradeStarted(activity?.gradeStarted ?? GRADE_OPTIONS[0])
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
-    onAdd({
+    setSaving(true)
+    await onSubmit({
       name: name.trim(),
       role: role.trim(),
       hoursPerWeek: parsedHours,
       gradeStarted,
     })
+    setSaving(false)
     handleOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button size="sm">
-            <Plus />
-            Add Activity
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add an activity</DialogTitle>
+          <DialogTitle>{activity ? "Edit activity" : "Add an activity"}</DialogTitle>
           <DialogDescription>
-            Track a club, sport, or other extracurricular.
+            {activity
+              ? "Update this activity's details."
+              : "Track a club, sport, or other extracurricular."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -181,8 +223,8 @@ function AddActivityDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
-            Add Activity
+          <Button onClick={handleSubmit} disabled={!canSubmit || saving}>
+            {activity ? "Save Changes" : "Add Activity"}
           </Button>
         </DialogFooter>
       </DialogContent>

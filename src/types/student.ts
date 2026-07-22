@@ -1,8 +1,10 @@
 export interface StudentProfile {
+  id: string
   name: string
   grade: string
   school: string
-  gradYear: number
+  gradYear: number | null
+  volunteerGoalHours: number
 }
 
 export interface VolunteerEntry {

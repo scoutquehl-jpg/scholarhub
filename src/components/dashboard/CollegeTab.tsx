@@ -1,4 +1,4 @@
-import { NotebookPen, Plus, School } from "lucide-react"
+import { NotebookPen, Pencil, Plus, School, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,15 +46,23 @@ const statusStyles: Record<SchoolStatus, string> = {
 interface CollegeTabProps {
   schools: CollegeEntry[]
   essays: Essay[]
-  onAddSchool: (school: Omit<CollegeEntry, "id">) => void
-  onAddEssay: (essay: Omit<Essay, "id">) => void
+  onAddSchool: (school: Omit<CollegeEntry, "id">) => void | Promise<void>
+  onEditSchool: (id: string, school: Omit<CollegeEntry, "id">) => void | Promise<void>
+  onDeleteSchool: (id: string) => void | Promise<void>
+  onAddEssay: (essay: Omit<Essay, "id">) => void | Promise<void>
+  onEditEssay: (id: string, essay: Omit<Essay, "id">) => void | Promise<void>
+  onDeleteEssay: (id: string) => void | Promise<void>
 }
 
 export function CollegeTab({
   schools,
   essays,
   onAddSchool,
+  onEditSchool,
+  onDeleteSchool,
   onAddEssay,
+  onEditEssay,
+  onDeleteEssay,
 }: CollegeTabProps) {
   return (
     <div className="flex flex-col gap-8">
@@ -63,7 +71,15 @@ export function CollegeTab({
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Schools
           </h2>
-          <AddSchoolDialog onAdd={onAddSchool} />
+          <SchoolDialog
+            onSubmit={onAddSchool}
+            trigger={
+              <Button size="sm">
+                <Plus />
+                Add School
+              </Button>
+            }
+          />
         </div>
 
         {schools.length > 0 ? (
@@ -84,14 +100,39 @@ export function CollegeTab({
                     {school.label}
                   </span>
                 </div>
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    statusStyles[school.status]
-                  )}
-                >
-                  {school.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      statusStyles[school.status]
+                    )}
+                  >
+                    {school.status}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <SchoolDialog
+                      school={school}
+                      onSubmit={(values) => onEditSchool(school.id, values)}
+                      trigger={
+                        <Button variant="ghost" size="icon-sm" aria-label="Edit school">
+                          <Pencil />
+                        </Button>
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete school"
+                      onClick={() => {
+                        if (confirm(`Delete "${school.name}"?`)) {
+                          onDeleteSchool(school.id)
+                        }
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -109,7 +150,15 @@ export function CollegeTab({
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Essay Tracker
           </h2>
-          <AddEssayDialog onAdd={onAddEssay} />
+          <EssayDialog
+            onSubmit={onAddEssay}
+            trigger={
+              <Button size="sm">
+                <Plus />
+                Add Essay
+              </Button>
+            }
+          />
         </div>
 
         {essays.length > 0 ? (
@@ -126,9 +175,34 @@ export function CollegeTab({
                       {essay.school}
                     </p>
                   </div>
-                  <span className="text-sm font-semibold tabular-nums">
-                    {essay.progress}%
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold tabular-nums">
+                      {essay.progress}%
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <EssayDialog
+                        essay={essay}
+                        onSubmit={(values) => onEditEssay(essay.id, values)}
+                        trigger={
+                          <Button variant="ghost" size="icon-sm" aria-label="Edit essay">
+                            <Pencil />
+                          </Button>
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Delete essay"
+                        onClick={() => {
+                          if (confirm(`Delete "${essay.title}"?`)) {
+                            onDeleteEssay(essay.id)
+                          }
+                        }}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <Progress value={essay.progress} className="mt-3" />
               </div>
@@ -146,48 +220,48 @@ export function CollegeTab({
   )
 }
 
-function AddSchoolDialog({
-  onAdd,
+function SchoolDialog({
+  school,
+  onSubmit,
+  trigger,
 }: {
-  onAdd: (school: Omit<CollegeEntry, "id">) => void
+  school?: CollegeEntry
+  onSubmit: (values: Omit<CollegeEntry, "id">) => void | Promise<void>
+  trigger: React.ReactElement
 }) {
   const [open, setOpen] = useState(false)
-  const [name, setName] = useState("")
-  const [label, setLabel] = useState<SchoolLabel>("Match")
-  const [status, setStatus] = useState<SchoolStatus>("Researching")
+  const [name, setName] = useState(school?.name ?? "")
+  const [label, setLabel] = useState<SchoolLabel>(school?.label ?? "Match")
+  const [status, setStatus] = useState<SchoolStatus>(school?.status ?? "Researching")
+  const [saving, setSaving] = useState(false)
 
   const canSubmit = name.trim() !== ""
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
-      setName("")
-      setLabel("Match")
-      setStatus("Researching")
+    if (next) {
+      setName(school?.name ?? "")
+      setLabel(school?.label ?? "Match")
+      setStatus(school?.status ?? "Researching")
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
-    onAdd({ name: name.trim(), label, status })
+    setSaving(true)
+    await onSubmit({ name: name.trim(), label, status })
+    setSaving(false)
     handleOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button size="sm">
-            <Plus />
-            Add School
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a school</DialogTitle>
+          <DialogTitle>{school ? "Edit school" : "Add a school"}</DialogTitle>
           <DialogDescription>
-            Track a college you're considering.
+            {school ? "Update this school's details." : "Track a college you're considering."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -204,7 +278,7 @@ function AddSchoolDialog({
             <Label htmlFor="school-label">Category</Label>
             <Select
               value={label}
-              onValueChange={(value) => setLabel(value as SchoolLabel)}
+              onValueChange={(value) => setLabel((value as SchoolLabel) ?? "Match")}
             >
               <SelectTrigger id="school-label" className="w-full">
                 <SelectValue />
@@ -222,7 +296,7 @@ function AddSchoolDialog({
             <Label htmlFor="school-status">Status</Label>
             <Select
               value={status}
-              onValueChange={(value) => setStatus(value as SchoolStatus)}
+              onValueChange={(value) => setStatus((value as SchoolStatus) ?? "Researching")}
             >
               <SelectTrigger id="school-status" className="w-full">
                 <SelectValue />
@@ -238,8 +312,8 @@ function AddSchoolDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
-            Add School
+          <Button onClick={handleSubmit} disabled={!canSubmit || saving}>
+            {school ? "Save Changes" : "Add School"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -247,15 +321,20 @@ function AddSchoolDialog({
   )
 }
 
-function AddEssayDialog({
-  onAdd,
+function EssayDialog({
+  essay,
+  onSubmit,
+  trigger,
 }: {
-  onAdd: (essay: Omit<Essay, "id">) => void
+  essay?: Essay
+  onSubmit: (values: Omit<Essay, "id">) => void | Promise<void>
+  trigger: React.ReactElement
 }) {
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState("")
-  const [school, setSchool] = useState("")
-  const [progress, setProgress] = useState("0")
+  const [title, setTitle] = useState(essay?.title ?? "")
+  const [school, setSchool] = useState(essay?.school ?? "")
+  const [progress, setProgress] = useState(essay ? String(essay.progress) : "0")
+  const [saving, setSaving] = useState(false)
 
   const parsedProgress = Number(progress)
   const canSubmit =
@@ -266,38 +345,35 @@ function AddEssayDialog({
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (!next) {
-      setTitle("")
-      setSchool("")
-      setProgress("0")
+    if (next) {
+      setTitle(essay?.title ?? "")
+      setSchool(essay?.school ?? "")
+      setProgress(essay ? String(essay.progress) : "0")
     }
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return
-    onAdd({
+    setSaving(true)
+    await onSubmit({
       title: title.trim(),
       school: school.trim() || "All schools",
       progress: parsedProgress,
     })
+    setSaving(false)
     handleOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button size="sm">
-            <Plus />
-            Add Essay
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add an essay</DialogTitle>
+          <DialogTitle>{essay ? "Edit essay" : "Add an essay"}</DialogTitle>
           <DialogDescription>
-            Track progress on a college essay or supplement.
+            {essay
+              ? "Update this essay's progress."
+              : "Track progress on a college essay or supplement."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -333,8 +409,8 @@ function AddEssayDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
-            Add Essay
+          <Button onClick={handleSubmit} disabled={!canSubmit || saving}>
+            {essay ? "Save Changes" : "Add Essay"}
           </Button>
         </DialogFooter>
       </DialogContent>
