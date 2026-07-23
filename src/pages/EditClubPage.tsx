@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Check, Plus, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Link, Navigate, useParams } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
@@ -26,12 +26,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/lib/auth"
 import {
   addAnnouncement,
+  approveMember,
   deleteAnnouncement,
   fetchAnnouncements,
   fetchClubById,
+  fetchPendingRequests,
+  rejectMember,
   updateClub,
+  type ClubMember,
 } from "@/lib/clubsData"
-import { formatTimestamp } from "@/lib/utils"
+import { formatTimestamp, initials } from "@/lib/utils"
 import type { Club, ClubAnnouncement } from "@/types/club"
 
 const COLOR_OPTIONS = [
@@ -56,6 +60,7 @@ export function EditClubPage() {
   const [club, setClub] = useState<Club | null>(null)
   const [loading, setLoading] = useState(true)
   const [announcements, setAnnouncements] = useState<ClubAnnouncement[]>([])
+  const [pendingRequests, setPendingRequests] = useState<ClubMember[]>([])
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -77,11 +82,15 @@ export function EditClubPage() {
     let cancelled = false
     setLoading(true)
 
-    Promise.all([fetchClubById(clubId), fetchAnnouncements(clubId)]).then(
-      ([clubResult, announcementsResult]) => {
+    Promise.all([
+      fetchClubById(clubId),
+      fetchAnnouncements(clubId),
+      fetchPendingRequests(clubId),
+    ]).then(([clubResult, announcementsResult, pendingResult]) => {
         if (cancelled) return
         setClub(clubResult)
         setAnnouncements(announcementsResult)
+        setPendingRequests(pendingResult)
         if (clubResult) {
           setName(clubResult.name)
           setDescription(clubResult.description)
@@ -99,8 +108,7 @@ export function EditClubPage() {
           )
         }
         setLoading(false)
-      }
-    )
+      })
 
     return () => {
       cancelled = true
@@ -202,6 +210,16 @@ export function EditClubPage() {
     if (!confirm("Delete this announcement?")) return
     await deleteAnnouncement(id)
     setAnnouncements((prev) => prev.filter((a) => a.id !== id))
+  }
+
+  async function handleApproveRequest(id: string) {
+    await approveMember(id)
+    setPendingRequests((prev) => prev.filter((r) => r.id !== id))
+  }
+
+  async function handleRejectRequest(id: string) {
+    await rejectMember(id)
+    setPendingRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
   return (
@@ -347,6 +365,64 @@ export function EditClubPage() {
               {saving ? "Saving..." : "Save Changes"}
             </Button>
             {saved && <span className="text-sm text-muted-foreground">Saved!</span>}
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            Membership Requests
+          </h2>
+          <div className="mt-3 flex flex-col gap-2">
+            {pendingRequests.length > 0 ? (
+              pendingRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                      {request.avatarUrl ? (
+                        <img
+                          src={request.avatarUrl}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        initials(request.name)
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{request.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Requested {formatTimestamp(request.requestedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Approve"
+                      onClick={() => handleApproveRequest(request.id)}
+                    >
+                      <Check />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Reject"
+                      onClick={() => handleRejectRequest(request.id)}
+                    >
+                      <X />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+                No pending membership requests.
+              </div>
+            )}
           </div>
         </div>
 

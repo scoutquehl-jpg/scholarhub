@@ -58,6 +58,18 @@ export async function fetchClubById(id: string): Promise<Club | null> {
   return data ? mapClubRow(data) : null
 }
 
+export async function fetchOwnedClub(userId: string): Promise<Club | null> {
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("*")
+    .eq("officer_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  if (error) throw error
+  return data && data.length > 0 ? mapClubRow(data[0]) : null
+}
+
 export async function updateClub(
   id: string,
   patch: Partial<Omit<Club, "id" | "officerId">>
@@ -225,4 +237,128 @@ export async function createInviteCode(adminUserId: string): Promise<InviteCode>
 
   if (error) throw error
   return mapInviteCodeRow(data)
+}
+
+export interface ClubMember {
+  id: string
+  userId: string
+  name: string
+  avatarUrl: string | null
+  requestedAt: string
+}
+
+export type MembershipStatus = "none" | "pending" | "approved"
+
+async function fetchProfilesByIds(
+  ids: string[]
+): Promise<Map<string, { name: string; avatarUrl: string | null }>> {
+  if (ids.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, name, avatar_url")
+    .in("id", ids)
+
+  if (error) throw error
+
+  const map = new Map<string, { name: string; avatarUrl: string | null }>()
+  for (const row of data) {
+    map.set(row.id, { name: row.name || "Member", avatarUrl: row.avatar_url })
+  }
+  return map
+}
+
+async function mapMemberRows(
+  rows: { id: string; user_id: string; requested_at: string }[]
+): Promise<ClubMember[]> {
+  const profiles = await fetchProfilesByIds(rows.map((row) => row.user_id))
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    name: profiles.get(row.user_id)?.name || "Member",
+    avatarUrl: profiles.get(row.user_id)?.avatarUrl ?? null,
+    requestedAt: row.requested_at,
+  }))
+}
+
+export async function fetchApprovedMembers(clubId: string): Promise<ClubMember[]> {
+  const { data, error } = await supabase
+    .from("club_members")
+    .select("id, user_id, requested_at")
+    .eq("club_id", clubId)
+    .eq("status", "approved")
+    .order("decided_at", { ascending: true })
+
+  if (error) throw error
+  return mapMemberRows(data)
+}
+
+export async function fetchPendingRequests(clubId: string): Promise<ClubMember[]> {
+  const { data, error } = await supabase
+    .from("club_members")
+    .select("id, user_id, requested_at")
+    .eq("club_id", clubId)
+    .eq("status", "pending")
+    .order("requested_at", { ascending: true })
+
+  if (error) throw error
+  return mapMemberRows(data)
+}
+
+export async function fetchMemberCount(clubId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("club_members")
+    .select("*", { count: "exact", head: true })
+    .eq("club_id", clubId)
+    .eq("status", "approved")
+
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function fetchMembershipStatus(
+  userId: string,
+  clubId: string
+): Promise<MembershipStatus> {
+  const { data, error } = await supabase
+    .from("club_members")
+    .select("status")
+    .eq("user_id", userId)
+    .eq("club_id", clubId)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data?.status as MembershipStatus) ?? "none"
+}
+
+export async function requestToJoin(userId: string, clubId: string): Promise<void> {
+  const { error } = await supabase
+    .from("club_members")
+    .insert({ user_id: userId, club_id: clubId, status: "pending" })
+
+  if (error) throw error
+}
+
+export async function cancelMembership(userId: string, clubId: string): Promise<void> {
+  const { error } = await supabase
+    .from("club_members")
+    .delete()
+    .eq("user_id", userId)
+    .eq("club_id", clubId)
+
+  if (error) throw error
+}
+
+export async function approveMember(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("club_members")
+    .update({ status: "approved", decided_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) throw error
+}
+
+export async function rejectMember(id: string): Promise<void> {
+  const { error } = await supabase.from("club_members").delete().eq("id", id)
+  if (error) throw error
 }

@@ -7,6 +7,8 @@ import {
   MapPin,
   Megaphone,
   Pencil,
+  Send,
+  UserCheck,
   UserPlus,
   Users,
 } from "lucide-react"
@@ -18,13 +20,20 @@ import { Header } from "@/components/Header"
 import { MessagePresidentDialog } from "@/components/MessagePresidentDialog"
 import { useAuth } from "@/lib/auth"
 import {
+  cancelMembership,
   fetchAnnouncements,
+  fetchApprovedMembers,
   fetchClubById,
   fetchFollowerCount,
+  fetchMemberCount,
+  fetchMembershipStatus,
   followClub,
   isFollowingClub,
+  requestToJoin,
   subscribeToAnnouncements,
   unfollowClub,
+  type ClubMember,
+  type MembershipStatus,
 } from "@/lib/clubsData"
 import { cn, formatTimestamp, initials } from "@/lib/utils"
 import type { Club, ClubAnnouncement } from "@/types/club"
@@ -40,6 +49,10 @@ export function ClubPage() {
   const [followerCount, setFollowerCount] = useState(0)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
+  const [memberCount, setMemberCount] = useState(0)
+  const [approvedMembers, setApprovedMembers] = useState<ClubMember[]>([])
+  const [membershipStatus, setMembershipStatus] = useState<MembershipStatus>("none")
+  const [joinBusy, setJoinBusy] = useState(false)
 
   useEffect(() => {
     if (!clubId) return
@@ -99,6 +112,29 @@ export function ClubPage() {
     }
   }, [club, session])
 
+  useEffect(() => {
+    if (!club) return
+    let cancelled = false
+
+    fetchMemberCount(club.id).then((count) => {
+      if (!cancelled) setMemberCount(count)
+    })
+
+    fetchApprovedMembers(club.id).then((members) => {
+      if (!cancelled) setApprovedMembers(members)
+    })
+
+    if (session) {
+      fetchMembershipStatus(session.user.id, club.id).then((status) => {
+        if (!cancelled) setMembershipStatus(status)
+      })
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [club, session])
+
   async function handleFollowToggle() {
     if (!club) return
     if (!session) {
@@ -119,6 +155,41 @@ export function ClubPage() {
       }
     } finally {
       setFollowBusy(false)
+    }
+  }
+
+  async function handleJoinClick() {
+    if (!club) return
+    if (!session) {
+      navigate("/login")
+      return
+    }
+
+    if (membershipStatus === "approved") {
+      if (!confirm("Leave this club?")) return
+      setJoinBusy(true)
+      try {
+        await cancelMembership(session.user.id, club.id)
+        setMembershipStatus("none")
+        setMemberCount((prev) => Math.max(0, prev - 1))
+        setApprovedMembers((prev) => prev.filter((m) => m.userId !== session.user.id))
+      } finally {
+        setJoinBusy(false)
+      }
+      return
+    }
+
+    setJoinBusy(true)
+    try {
+      if (membershipStatus === "none") {
+        await requestToJoin(session.user.id, club.id)
+        setMembershipStatus("pending")
+      } else if (membershipStatus === "pending") {
+        await cancelMembership(session.user.id, club.id)
+        setMembershipStatus("none")
+      }
+    } finally {
+      setJoinBusy(false)
     }
   }
 
@@ -181,7 +252,7 @@ export function ClubPage() {
               >
                 {club.emoji}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {isOfficer && (
                   <Link
                     to={`/clubs/${club.id}/edit`}
@@ -194,6 +265,30 @@ export function ClubPage() {
                 {president && (
                   <MessagePresidentDialog president={president} clubName={club.name} />
                 )}
+                <Button
+                  variant={
+                    membershipStatus === "approved"
+                      ? "secondary"
+                      : membershipStatus === "pending"
+                        ? "secondary"
+                        : "outline"
+                  }
+                  onClick={handleJoinClick}
+                  disabled={joinBusy}
+                >
+                  {membershipStatus === "approved" ? (
+                    <UserCheck />
+                  ) : membershipStatus === "pending" ? (
+                    <Clock />
+                  ) : (
+                    <Send />
+                  )}
+                  {membershipStatus === "approved"
+                    ? "Member"
+                    : membershipStatus === "pending"
+                      ? "Request Pending"
+                      : "Request to Join"}
+                </Button>
                 <Button
                   variant={following ? "secondary" : "default"}
                   onClick={handleFollowToggle}
@@ -216,12 +311,21 @@ export function ClubPage() {
               {club.longDescription || "This club hasn't added a description yet."}
             </p>
 
-            <div className="mt-4 flex items-center gap-1.5 border-t border-border pt-4 text-sm">
-              <Users className="size-4 text-muted-foreground" />
-              <span className="font-semibold text-foreground">
-                {followerCount}
-              </span>
-              <span className="text-muted-foreground">members</span>
+            <div className="mt-4 flex flex-wrap items-center gap-6 border-t border-border pt-4 text-sm">
+              <div className="flex items-center gap-1.5">
+                <Users className="size-4 text-muted-foreground" />
+                <span className="font-semibold text-foreground">
+                  {followerCount}
+                </span>
+                <span className="text-muted-foreground">followers</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <UserCheck className="size-4 text-muted-foreground" />
+                <span className="font-semibold text-foreground">
+                  {memberCount}
+                </span>
+                <span className="text-muted-foreground">members</span>
+              </div>
             </div>
           </div>
         </div>
@@ -322,6 +426,34 @@ export function ClubPage() {
                           {leader.role}
                         </p>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {approvedMembers.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Members
+                </h2>
+                <div className="mt-3 flex flex-col gap-3">
+                  {approvedMembers.map((member) => (
+                    <div key={member.id} className="flex items-center gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt=""
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          initials(member.name)
+                        )}
+                      </div>
+                      <p className="truncate text-sm font-medium">
+                        {member.name}
+                      </p>
                     </div>
                   ))}
                 </div>

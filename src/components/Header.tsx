@@ -1,11 +1,30 @@
 import { GraduationCap } from "lucide-react"
+import { useEffect, useState } from "react"
 import { Link, NavLink } from "react-router-dom"
 import { AuthStatus } from "@/components/AuthStatus"
 import { useAuth } from "@/lib/auth"
+import { fetchOwnedClub } from "@/lib/clubsData"
 import { cn } from "@/lib/utils"
 
 export function Header({ children }: { children?: React.ReactNode }) {
   const { session } = useAuth()
+  const [ownedClubId, setOwnedClubId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!session) {
+      setOwnedClubId(null)
+      return
+    }
+
+    let cancelled = false
+    fetchOwnedClub(session.user.id).then((club) => {
+      if (!cancelled) setOwnedClubId(club?.id ?? null)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [session])
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -26,8 +45,14 @@ export function Header({ children }: { children?: React.ReactNode }) {
                 Clubs
               </HeaderNavLink>
               <HeaderNavLink to="/dashboard">My Dashboard</HeaderNavLink>
-              {session && (
-                <HeaderNavLink to="/claim">Claim Club</HeaderNavLink>
+              {ownedClubId ? (
+                <HeaderNavLink to={`/clubs/${ownedClubId}/edit`}>
+                  My Club
+                </HeaderNavLink>
+              ) : (
+                session && (
+                  <HeaderNavLink to="/claim">Claim Club</HeaderNavLink>
+                )
               )}
             </nav>
           </div>
