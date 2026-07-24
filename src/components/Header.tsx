@@ -44,6 +44,7 @@ export function Header({ children }: { children?: React.ReactNode }) {
               <HeaderNavLink to="/" end>
                 Clubs
               </HeaderNavLink>
+              <HeaderNavLink to="/opportunities">Opportunities</HeaderNavLink>
               <HeaderNavLink to="/dashboard">My Dashboard</HeaderNavLink>
               {ownedClubId ? (
                 <HeaderNavLink to={`/clubs/${ownedClubId}/edit`}>

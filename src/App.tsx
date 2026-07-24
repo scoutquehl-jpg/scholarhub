@@ -4,6 +4,7 @@ import { ClubPage } from "@/pages/ClubPage"
 import { EditClubPage } from "@/pages/EditClubPage"
 import { ClaimClubPage } from "@/pages/ClaimClubPage"
 import { AdminPage } from "@/pages/AdminPage"
+import { OpportunityBoardPage } from "@/pages/OpportunityBoardPage"
 import { DashboardPage } from "@/pages/DashboardPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { SignupPage } from "@/pages/SignupPage"
@@ -19,6 +20,7 @@ function App() {
           <Route path="/clubs/:clubId/edit" element={<EditClubPage />} />
           <Route path="/claim" element={<ClaimClubPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/opportunities" element={<OpportunityBoardPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
