@@ -13,7 +13,12 @@ import {
 } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth"
 import * as dashboardData from "@/lib/dashboardData"
-import { fetchClubs } from "@/lib/clubsData"
+import {
+  fetchClubs,
+  fetchMyMemberships,
+  subscribeToMyMemberships,
+  type MyMembership,
+} from "@/lib/clubsData"
 import type { Club } from "@/types/club"
 import type {
   CollegeEntry,
@@ -31,6 +36,7 @@ export function DashboardPage() {
   const [schools, setSchools] = useState<CollegeEntry[]>([])
   const [essays, setEssays] = useState<Essay[]>([])
   const [clubs, setClubs] = useState<Club[]>([])
+  const [memberships, setMemberships] = useState<MyMembership[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,13 +46,14 @@ export function DashboardPage() {
     setLoading(true)
 
     Promise.all([
-      dashboardData.getOrCreateProfile(session.user.id),
+      dashboardData.getOrCreateProfile(session.user.id, session.user.email ?? ""),
       dashboardData.fetchVolunteerEntries(session.user.id),
       dashboardData.fetchExtracurriculars(session.user.id),
       dashboardData.fetchSchools(session.user.id),
       dashboardData.fetchEssays(session.user.id),
       fetchClubs(),
-    ]).then(([p, v, a, s, e, c]) => {
+      fetchMyMemberships(session.user.id),
+    ]).then(([p, v, a, s, e, c, m]) => {
       if (cancelled) return
       setProfile(p)
       setVolunteerEntries(v)
@@ -54,12 +61,23 @@ export function DashboardPage() {
       setSchools(s)
       setEssays(e)
       setClubs(c)
+      setMemberships(m)
       setLoading(false)
     })
 
     return () => {
       cancelled = true
     }
+  }, [session])
+
+  useEffect(() => {
+    if (!session) return
+
+    const unsubscribe = subscribeToMyMemberships(session.user.id, () => {
+      fetchMyMemberships(session.user.id).then(setMemberships)
+    })
+
+    return unsubscribe
   }, [session])
 
   if (!authLoading && !session) {
@@ -170,6 +188,7 @@ export function DashboardPage() {
           totalVolunteerHours={totalVolunteerHours}
           activityCount={activities.length}
           schoolCount={schools.length}
+          memberships={memberships}
           onSave={handleProfileSave}
           onAvatarUpload={handleAvatarUpload}
           onBannerUpload={handleBannerUpload}

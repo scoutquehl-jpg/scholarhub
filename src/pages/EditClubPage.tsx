@@ -394,7 +394,7 @@ export function EditClubPage() {
                     <div>
                       <p className="text-sm font-medium">{request.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Requested {formatTimestamp(request.requestedAt)}
+                        {request.email || `Requested ${formatTimestamp(request.requestedAt)}`}
                       </p>
                     </div>
                   </div>

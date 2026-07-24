@@ -9,7 +9,10 @@ import type {
   VolunteerEntry,
 } from "@/types/student"
 
-export async function getOrCreateProfile(userId: string): Promise<StudentProfile> {
+export async function getOrCreateProfile(
+  userId: string,
+  email: string
+): Promise<StudentProfile> {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
@@ -28,6 +31,7 @@ export async function getOrCreateProfile(userId: string): Promise<StudentProfile
       volunteerGoalHours: data.volunteer_goal_hours,
       avatarUrl: data.avatar_url,
       bannerUrl: data.banner_url,
+      isPublic: data.is_public,
     }
   }
 
@@ -40,6 +44,7 @@ export async function getOrCreateProfile(userId: string): Promise<StudentProfile
       school: "",
       grad_year: null,
       volunteer_goal_hours: 50,
+      email,
     })
     .select()
     .single()
@@ -55,6 +60,7 @@ export async function getOrCreateProfile(userId: string): Promise<StudentProfile
     volunteerGoalHours: inserted.volunteer_goal_hours,
     avatarUrl: inserted.avatar_url,
     bannerUrl: inserted.banner_url,
+    isPublic: inserted.is_public,
   }
 }
 
@@ -72,6 +78,7 @@ export async function updateProfile(
   }
   if (patch.avatarUrl !== undefined) dbPatch.avatar_url = patch.avatarUrl
   if (patch.bannerUrl !== undefined) dbPatch.banner_url = patch.bannerUrl
+  if (patch.isPublic !== undefined) dbPatch.is_public = patch.isPublic
 
   const { error } = await supabase.from("profiles").update(dbPatch).eq("id", userId)
   if (error) throw error

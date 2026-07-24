@@ -3,8 +3,10 @@ import {
   GraduationCap,
   HeartHandshake,
   Loader2,
+  Lock,
   Pencil,
   School,
+  Unlock,
   UserRound,
 } from "lucide-react"
 import { useRef, useState } from "react"
@@ -28,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GRADE_OPTIONS } from "@/data/student"
+import type { MyMembership } from "@/lib/clubsData"
 import { cn, initials } from "@/lib/utils"
 import type { StudentProfile } from "@/types/student"
 
@@ -36,6 +39,7 @@ interface ProfileHeaderProps {
   totalVolunteerHours: number
   activityCount: number
   schoolCount: number
+  memberships: MyMembership[]
   onSave: (patch: Partial<Omit<StudentProfile, "id">>) => void | Promise<void>
   onAvatarUpload: (file: File) => void | Promise<void>
   onBannerUpload: (file: File) => void | Promise<void>
@@ -46,6 +50,7 @@ export function ProfileHeader({
   totalVolunteerHours,
   activityCount,
   schoolCount,
+  memberships,
   onSave,
   onAvatarUpload,
   onBannerUpload,
@@ -91,7 +96,20 @@ export function ProfileHeader({
               className="absolute right-0 bottom-0"
             />
           </div>
-          <EditProfileDialog profile={profile} onSave={onSave} />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={
+                profile.isPublic ? "Make profile private" : "Make profile public"
+              }
+              onClick={() => onSave({ isPublic: !profile.isPublic })}
+            >
+              {profile.isPublic ? <Unlock /> : <Lock />}
+              {profile.isPublic ? "Public" : "Private"}
+            </Button>
+            <EditProfileDialog profile={profile} onSave={onSave} />
+          </div>
         </div>
 
         <div className="mt-4">
@@ -114,6 +132,20 @@ export function ProfileHeader({
             )}
           </p>
         </div>
+
+        {memberships.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {memberships.map((membership) => (
+              <span
+                key={membership.clubId}
+                className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground"
+              >
+                <span>{membership.emoji}</span>
+                Member of {membership.clubName}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-4 text-sm">
           <div className="flex items-center gap-1.5">

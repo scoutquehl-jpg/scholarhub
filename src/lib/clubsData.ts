@@ -243,6 +243,7 @@ export interface ClubMember {
   id: string
   userId: string
   name: string
+  email: string
   avatarUrl: string | null
   requestedAt: string
 }
@@ -251,19 +252,23 @@ export type MembershipStatus = "none" | "pending" | "approved"
 
 async function fetchProfilesByIds(
   ids: string[]
-): Promise<Map<string, { name: string; avatarUrl: string | null }>> {
+): Promise<Map<string, { name: string; email: string; avatarUrl: string | null }>> {
   if (ids.length === 0) return new Map()
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, name, avatar_url")
+    .select("id, name, email, avatar_url")
     .in("id", ids)
 
   if (error) throw error
 
-  const map = new Map<string, { name: string; avatarUrl: string | null }>()
+  const map = new Map<string, { name: string; email: string; avatarUrl: string | null }>()
   for (const row of data) {
-    map.set(row.id, { name: row.name || "Member", avatarUrl: row.avatar_url })
+    map.set(row.id, {
+      name: row.name || "Member",
+      email: row.email || "",
+      avatarUrl: row.avatar_url,
+    })
   }
   return map
 }
@@ -276,6 +281,7 @@ async function mapMemberRows(
     id: row.id,
     userId: row.user_id,
     name: profiles.get(row.user_id)?.name || "Member",
+    email: profiles.get(row.user_id)?.email || "",
     avatarUrl: profiles.get(row.user_id)?.avatarUrl ?? null,
     requestedAt: row.requested_at,
   }))
@@ -361,4 +367,53 @@ export async function approveMember(id: string): Promise<void> {
 export async function rejectMember(id: string): Promise<void> {
   const { error } = await supabase.from("club_members").delete().eq("id", id)
   if (error) throw error
+}
+
+export interface MyMembership {
+  clubId: string
+  clubName: string
+  emoji: string
+  color: string
+}
+
+export async function fetchMyMemberships(userId: string): Promise<MyMembership[]> {
+  const { data, error } = await supabase
+    .from("club_members")
+    .select("club_id, clubs(name, emoji, color)")
+    .eq("user_id", userId)
+    .eq("status", "approved")
+
+  if (error) throw error
+
+  return (data as unknown as {
+    club_id: string
+    clubs: { name: string; emoji: string; color: string } | null
+  }[])
+    .filter((row) => row.clubs !== null)
+    .map((row) => ({
+      clubId: row.club_id,
+      clubName: row.clubs!.name,
+      emoji: row.clubs!.emoji,
+      color: row.clubs!.color,
+    }))
+}
+
+export function subscribeToMyMemberships(userId: string, onChange: () => void) {
+  const channel = supabase
+    .channel(`my-memberships-${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "club_members",
+        filter: `user_id=eq.${userId}`,
+      },
+      () => onChange()
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
 }

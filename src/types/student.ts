@@ -7,6 +7,7 @@ export interface StudentProfile {
   volunteerGoalHours: number
   avatarUrl: string | null
   bannerUrl: string | null
+  isPublic: boolean
 }
 
 export interface VolunteerEntry {
